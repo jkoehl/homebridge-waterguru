@@ -1,16 +1,22 @@
 {
-  "pluginAlias": "ExampleHomebridgePlugin",
+  "pluginAlias": "Waterguru",
   "pluginType": "platform",
   "singular": true,
   "schema": {
     "type": "object",
     "properties": {
-      "name": {
-        "title": "Name",
+      "wg-username": {
+        "title": "Waterguru Username",
         "type": "string",
         "required": true,
-        "default": "Example Dynamic Platform"
-      }
+        "default": ""
+      },
+      "wg-password": {
+        "title": "Waterguru Password",
+        "type": "string",
+        "required": true,
+        "default": ""
+      }      
     }
   }
 }
