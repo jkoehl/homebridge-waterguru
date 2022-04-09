@@ -1,55 +1,27 @@
-// import AWS from 'aws-sdk';
-// import crypto from 'crypto';
+import { Amplify, Auth } from 'aws-amplify';
+import { CognitoUser } from '@aws-amplify/auth';
 
-// export default class Cognito {
+export default class Cognito {
 
-//   private region = 'us-west-2';
-//   private clientId = '7pk5du7fitqb419oabb3r92lni';
-//   private identityPoolId = 'us-west-2:691e3287-5776-40f2-a502-759de65a8f1c';
-//   private poolId = 'us-west-2_icsnuWQWw';
+  private region = 'us-west-2';
+  private clientId = '7pk5du7fitqb419oabb3r92lni';
+  private identityPoolId = 'us-west-2:691e3287-5776-40f2-a502-759de65a8f1c';
+  private poolId = 'us-west-2_icsnuWQWw';
 
-//   private config = {
-//     region: 'us-west-2',
-//     identityPoolId: this.identityPoolId,
-//     poolId: this.poolId,
-//     accessKeyId: 'ff',
-//     secretAccessKey: 'fff',
-//   };
+  public cognitoUser: CognitoUser | null = null;
 
-//   private cognitoIdentity;
+  constructor() {
+    Amplify.configure({
+      aws_project_region: this.region,
+      aws_cognito_region: this.region,
+      aws_user_pools_id: this.poolId,
+      aws_user_pools_web_client_id: this.clientId,
+      aws_cognito_identity_pool_id: this.identityPoolId,
+    });
+  }
 
-//   constructor(){
-
-//     AWS.config.update({region : 'us-west-2'});
-
-//     AWS.config.credentials = new AWS.CognitoIdentityCredentials({
-//       IdentityPoolId: this.identityPoolId,
-//     }, {
-//       region: this.region,
-//     },
-//     );
-
-//     this.cognitoIdentity = new AWS.CognitoIdentityServiceProvider();
-//   }
-
-//   public async signInUser(username: string, password: string): Promise<boolean> {
-//     const params = {
-//       AuthFlow: 'USER_SRP_AUTH', /* required */
-//       ClientId: this.clientId, /* required */
-//       UserPoolId: this.poolId,
-//       AuthParameters: {
-//         'USERNAME': username,
-//         'PASSWORD': password,
-//       },
-//     };
-
-//     try {
-//       const data = await this.cognitoIdentity.adminInitiateAuth(params).promise();
-//       console.log(data);
-//       return true;
-//     } catch (error) {
-//       console.log(error);
-//       return false;
-//     }
-//   }
-// }
+  public async signInUser(username: string, password: string): Promise<CognitoUser | any> {
+    this.cognitoUser = await Auth.signIn(username, password);
+    return this.cognitoUser;
+  }
+}
