@@ -24,7 +24,8 @@ export class WaterguruPlatformAccessory {
     svc.addOptionalCharacteristic(this.platform.customCharacteristic.characteristic.FreeChlorine);
     svc.addOptionalCharacteristic(this.platform.customCharacteristic.characteristic.pH);
 
-    this.service = this.accessory.getService(this.platform.Service.TemperatureSensor) || this.accessory.addService(this.platform.Service.TemperatureSensor);
+    this.service = this.accessory.getService(this.platform.Service.TemperatureSensor) ||
+     this.accessory.addService(this.platform.Service.TemperatureSensor);
     this.service.setCharacteristic(this.platform.Characteristic.Name, 'Water Temp');
 
     this.service.getCharacteristic(this.platform.Characteristic.CurrentTemperature)
