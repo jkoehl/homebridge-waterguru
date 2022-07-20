@@ -16,16 +16,25 @@ export class WaterguruPlatformAccessory {
   ) {
 
     // set accessory information
-    this.accessory.getService(this.platform.Service.AccessoryInformation)!
+    const svc = this.accessory.getService(this.platform.Service.AccessoryInformation)!
       .setCharacteristic(this.platform.Characteristic.Manufacturer, 'WaterGuru')
       .setCharacteristic(this.platform.Characteristic.Model, 'Unknown')
       .setCharacteristic(this.platform.Characteristic.SerialNumber, 'Unknown');
+
+    svc.addOptionalCharacteristic(this.platform.customCharacteristic.characteristic.FreeChlorine);
+    svc.addOptionalCharacteristic(this.platform.customCharacteristic.characteristic.pH);
 
     this.service = this.accessory.getService(this.platform.Service.TemperatureSensor) || this.accessory.addService(this.platform.Service.TemperatureSensor);
     this.service.setCharacteristic(this.platform.Characteristic.Name, 'Water Temp');
 
     this.service.getCharacteristic(this.platform.Characteristic.CurrentTemperature)
       .onGet(this.getCurrentTemp.bind(this));
+
+    this.service.getCharacteristic(this.platform.customCharacteristic.characteristic.FreeChlorine)
+      .onGet(this.getCurrentFreeChlorine.bind(this));
+
+    this.service.getCharacteristic(this.platform.customCharacteristic.characteristic.pH)
+      .onGet(this.getCurrentPh.bind(this));
 
     // register handlers for the Brightness Characteristic
     // this.service.getCharacteristic(this.platform.Characteristic.Brightness)
@@ -83,8 +92,26 @@ export class WaterguruPlatformAccessory {
   //   this.platform.log.debug('Set Characteristic On ->', value);
   // }
 
+
+
   async getCurrentTemp(): Promise<CharacteristicValue> {
+    const waterBody = await this.platform.waterguruSvc?.getWaterbodyInfo(this.accessory.UUID);
+    this.accessory.context.device = waterBody;
     return (5/9) * (this.accessory.context.device.waterTemp - 32);
+  }
+
+  async getCurrentFreeChlorine(): Promise<CharacteristicValue> {
+    const waterBody = await this.platform.waterguruSvc?.getWaterbodyInfo(this.accessory.UUID);
+    this.accessory.context.device = waterBody;
+    const measurement = this.accessory.context.device.measurements.find((measurement) => (measurement.type === 'FREE_CL'));
+    return parseFloat(measurement.value);
+  }
+
+  async getCurrentPh(): Promise<CharacteristicValue> {
+    const waterBody = await this.platform.waterguruSvc?.getWaterbodyInfo(this.accessory.UUID);
+    this.accessory.context.device = waterBody;
+    const measurement = this.accessory.context.device.measurements.find((measurement) => (measurement.type === 'PH'));
+    return parseFloat(measurement.value);
   }
 
   /**

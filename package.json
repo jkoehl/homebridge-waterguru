@@ -28,6 +28,7 @@
     "homebridge-plugin"
   ],
   "dependencies": {
+    "async-debounce-promise": "^0.0.2",
     "aws-amplify": "^4.3.18",
     "crypto": "^1.0.1"
   },
