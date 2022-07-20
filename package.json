@@ -1,5 +1,4 @@
 {
-  "private": true,
   "displayName": "Homebridge Waterguru",
   "name": "@jkoehl/homebridge-waterguru",
   "version": "0.1.0",
