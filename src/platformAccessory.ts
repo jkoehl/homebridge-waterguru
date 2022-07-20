@@ -26,7 +26,7 @@ export class WaterguruPlatformAccessory {
 
     this.service = this.accessory.getService(this.platform.Service.TemperatureSensor) ||
      this.accessory.addService(this.platform.Service.TemperatureSensor);
-    this.service.setCharacteristic(this.platform.Characteristic.Name, 'Water Temp');
+    this.service.setCharacteristic(this.platform.Characteristic.Name, 'Temperature');
 
     this.service.getCharacteristic(this.platform.Characteristic.CurrentTemperature)
       .onGet(this.getCurrentTemp.bind(this));
