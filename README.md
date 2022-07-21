@@ -2,14 +2,17 @@ Under construction...I just got my Waterguru so just now figuring out how best t
 
 # homebridge-waterguru
 
-waterguru plug-in for [Homebridge](https://github.com/nfarina/homebridge) using their unofficial API.
+waterguru plug-in for [Homebridge](https://github.com/nfarina/homebridge) using Waterguru's unofficial API.
 
 ## Features
 
 This plugin currently supports the following devices and features:
 
-- Multiple waterbodies
-- TBD...
+- Current Temperture: The waterguru updates the temperature about every 30 minutes
+
+Half-baked features:
+
+- Custom attributes for Free Chlorine and Ph on the temperature sensor accessory
 
 ## Installation
 
