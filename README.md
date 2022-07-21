@@ -48,7 +48,7 @@ Add the `waterguru` platform in your homebridge `config.json` file:
 ```
 
 ## Technical Implementation Details
-I used the Amazon Amplify framework to make it much esaier to authenticate to the Waterguru API. They are using AWS Cognitio to authenticate users and then tokens from Cognito to make calls to a Lambda. Doing that dance manually is a pain but with Amplify it was super easy.
+I used the Amazon Amplify framework to make it much easier to authenticate to the Waterguru API. They are using AWS Cognitio to authenticate users and then tokens from Cognito to make calls to a Lambda. Doing that dance manually is a pain but with Amplify it was super easy.
 
 I used Charles proxy to see what the waterguru API delivered as payload. The API has a ton of really interesting info which drives their mobile app. Their mobile app is actually pretty great with lots of trends views and such. I am simply pulling the latest values since that is about all HomeKit is good at doing.
 
