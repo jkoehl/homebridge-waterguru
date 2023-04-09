@@ -54,7 +54,7 @@ I used Charles proxy to see what the waterguru API delivered as payload. The API
 
 The HomeKit platform doesn't really support the concept of a water sensor for chemistry so I ended up trying to add custom characteristics to a temperature sensor accessory. But really I would probably use their app anyway to dig deeper into the water details and trends.
 
-I did not persue adding functionality to initiate a water test. Most people probably just let it do its daily test since the test cartridges are expensive and I wouldn't want to burn through someones tests with a mistake in my plug-in.
+I did not pursue adding functionality to initiate a water test. Most people probably just let it do its daily test since the test cartridges are expensive and I wouldn't want to burn through someones tests with a mistake in my plug-in.
 
 ## Support
 
