@@ -1,4 +1,4 @@
-import { Service, PlatformAccessory, CharacteristicValue, Characteristic } from 'homebridge';
+import { Service, PlatformAccessory, CharacteristicValue } from 'homebridge';
 import { v4 as uuidv4 } from 'uuid';
 
 import { WaterguruPlatform } from './platform';
