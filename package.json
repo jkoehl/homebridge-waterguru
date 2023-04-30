@@ -29,7 +29,8 @@
   "dependencies": {
     "async-debounce-promise": "^0.0.2",
     "aws-amplify": "^5.0",
-    "crypto": "^1.0.1"
+    "crypto": "^1.0.1",
+    "uuid": "^9.0.0"
   },
   "devDependencies": {
     "@types/node": "^18.0",

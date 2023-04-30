@@ -1,85 +1,71 @@
-import { Service, PlatformAccessory, CharacteristicValue } from 'homebridge';
+import { Service, PlatformAccessory, CharacteristicValue, Characteristic } from 'homebridge';
+import { v4 as uuidv4 } from 'uuid';
 
 import { WaterguruPlatform } from './platform';
 
-/**
- * Platform Accessory
- * An instance of this class is created for each accessory your platform registers
- * Each accessory may expose multiple services of different service types.
- */
+// Custom UUIDs for services and characteristics
+const CustomServiceUUID = {
+  PhService: uuidv4(),
+  ChlorineService: uuidv4(),
+};
+
+const CustomCharacteristicUUID = {
+  CurrentPh: uuidv4(),
+  CurrentChlorine: uuidv4(),
+};
+
 export class WaterguruPlatformAccessory {
-  private service: Service;
+  private temperatureService: Service;
+  private phService: Service;
+  private chlorineService: Service;
 
   constructor(
     private readonly platform: WaterguruPlatform,
     private readonly accessory: PlatformAccessory,
   ) {
 
-    // set accessory information
-    const svc = this.accessory.getService(this.platform.Service.AccessoryInformation)!
+    // Set accessory information
+    this.accessory.getService(this.platform.Service.AccessoryInformation)!
       .setCharacteristic(this.platform.Characteristic.Manufacturer, 'WaterGuru')
       .setCharacteristic(this.platform.Characteristic.Model, 'Unknown')
       .setCharacteristic(this.platform.Characteristic.SerialNumber, 'Unknown');
 
-    svc.addOptionalCharacteristic(this.platform.customCharacteristic.characteristic.FreeChlorine);
-    svc.addOptionalCharacteristic(this.platform.customCharacteristic.characteristic.pH);
-
-    this.service = this.accessory.getService(this.platform.Service.TemperatureSensor) ||
+    // Create Temperature Service
+    this.temperatureService = this.accessory.getService(this.platform.Service.TemperatureSensor) ||
      this.accessory.addService(this.platform.Service.TemperatureSensor);
-    this.service.setCharacteristic(this.platform.Characteristic.Name, 'Temperature');
-
-    this.service.getCharacteristic(this.platform.Characteristic.CurrentTemperature)
+    this.temperatureService.setCharacteristic(this.platform.Characteristic.Name, 'Temperature');
+    this.temperatureService.getCharacteristic(this.platform.Characteristic.CurrentTemperature)
       .onGet(this.getCurrentTemp.bind(this));
 
-    this.service.getCharacteristic(this.platform.customCharacteristic.characteristic.FreeChlorine)
-      .onGet(this.getCurrentFreeChlorine.bind(this));
+    // Create Ph Service
+    this.phService = this.accessory.services.find(service => service.UUID === CustomServiceUUID.PhService) ||
+      this.accessory.addService(new this.platform.Service('Ph', CustomServiceUUID.PhService));
+    this.phService.setCharacteristic(this.platform.Characteristic.Name, 'Ph');
+    const CurrentPh = new this.platform.api.hap.Characteristic('Current Ph', CustomCharacteristicUUID.CurrentPh, {
+      format: this.platform.Characteristic.Formats.FLOAT,
+      unit: 'ph',
+      minValue: 0,
+      maxValue: 14,
+      minStep: 0.1,
+      perms: [this.platform.Characteristic.Perms.READ, this.platform.Characteristic.Perms.NOTIFY],
+    });
+    this.phService.addCharacteristic(CurrentPh);
+    CurrentPh.onGet(this.getCurrentPh.bind(this));
 
-    this.service.getCharacteristic(this.platform.customCharacteristic.characteristic.pH)
-      .onGet(this.getCurrentPh.bind(this));
-
-    // register handlers for the Brightness Characteristic
-    // this.service.getCharacteristic(this.platform.Characteristic.Brightness)
-    //   .onSet(this.setBrightness.bind(this));       // SET - bind to the 'setBrightness` method below
-
-    /**
-     * Creating multiple services of the same type.
-     *
-     * To avoid "Cannot add a Service with the same UUID another Service without also defining a unique 'subtype' property." error,
-     * when creating multiple services of the same type, you need to use the following syntax to specify a name and subtype id:
-     * this.accessory.getService('NAME') || this.accessory.addService(this.platform.Service.Lightbulb, 'NAME', 'USER_DEFINED_SUBTYPE_ID');
-     *
-     * The USER_DEFINED_SUBTYPE must be unique to the platform accessory (if you platform exposes multiple accessories, each accessory
-     * can use the same sub type id.)
-     */
-
-    // Example: add two "motion sensor" services to the accessory
-    // const motionSensorOneService = this.accessory.getService('Motion Sensor One Name') ||
-    //   this.accessory.addService(this.platform.Service.MotionSensor, 'Motion Sensor One Name', 'YourUniqueIdentifier-1');
-
-    // const motionSensorTwoService = this.accessory.getService('Motion Sensor Two Name') ||
-    //   this.accessory.addService(this.platform.Service.MotionSensor, 'Motion Sensor Two Name', 'YourUniqueIdentifier-2');
-
-    /**
-     * Updating characteristics values asynchronously.
-     *
-     * Example showing how to update the state of a Characteristic asynchronously instead
-     * of using the `on('get')` handlers.
-     * Here we change update the motion sensor trigger states on and off every 10 seconds
-     * the `updateCharacteristic` method.
-     *
-     */
-    // let motionDetected = false;
-    // setInterval(() => {
-    //   // EXAMPLE - inverse the trigger
-    //   motionDetected = !motionDetected;
-
-    //   // push the new value to HomeKit
-    //   motionSensorOneService.updateCharacteristic(this.platform.Characteristic.MotionDetected, motionDetected);
-    //   motionSensorTwoService.updateCharacteristic(this.platform.Characteristic.MotionDetected, !motionDetected);
-
-    //   this.platform.log.debug('Triggering motionSensorOneService:', motionDetected);
-    //   this.platform.log.debug('Triggering motionSensorTwoService:', !motionDetected);
-    // }, 10000);
+    // Create Chlorine Service
+    this.chlorineService = this.accessory.services.find(service => service.UUID === CustomServiceUUID.ChlorineService) ||
+      this.accessory.addService(new this.platform.Service('Chlorine', CustomServiceUUID.ChlorineService));
+    this.chlorineService.setCharacteristic(this.platform.Characteristic.Name, 'Chlorine');
+    const CurrentChlorine = new this.platform.api.hap.Characteristic('Current Chlorine', CustomCharacteristicUUID.CurrentChlorine, {
+      format: this.platform.Characteristic.Formats.FLOAT,
+      unit: 'ppm',
+      minValue: 0,
+      maxValue: 10,
+      minStep: 0.1,
+      perms: [this.platform.Characteristic.Perms.READ, this.platform.Characteristic.Perms.NOTIFY],
+    });
+    this.chlorineService.addCharacteristic(CurrentChlorine);
+    CurrentChlorine.onGet(this.getCurrentFreeChlorine.bind(this));
   }
 
   /**
