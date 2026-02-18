@@ -1,17 +1,16 @@
 import { Service, PlatformAccessory, CharacteristicValue } from 'homebridge';
-import { v4 as uuidv4 } from 'uuid';
 
 import { WaterguruPlatform } from './platform';
 
-// Custom UUIDs for services and characteristics
+// Fixed UUIDs — must never change or HomeKit will create orphaned services on every restart
 const CustomServiceUUID = {
-  PhService: uuidv4(),
-  ChlorineService: uuidv4(),
+  PhService: 'A0000001-079E-48FF-8F27-9C2605A29F52',
+  ChlorineService: 'A0000002-079E-48FF-8F27-9C2605A29F52',
 };
 
 const CustomCharacteristicUUID = {
-  CurrentPh: uuidv4(),
-  CurrentChlorine: uuidv4(),
+  CurrentPh: 'B863F10C-079E-48FF-8F27-9C2605A29F52',
+  CurrentChlorine: 'B863F10D-079E-48FF-8F27-9C2605A29F52',
 };
 
 export class WaterguruPlatformAccessory {
@@ -47,7 +46,7 @@ export class WaterguruPlatformAccessory {
       minValue: 0,
       maxValue: 14,
       minStep: 0.1,
-      perms: [this.platform.Characteristic.Perms.READ, this.platform.Characteristic.Perms.NOTIFY],
+      perms: [this.platform.Characteristic.Perms.PAIRED_READ, this.platform.Characteristic.Perms.NOTIFY],
     });
     this.phService.addCharacteristic(CurrentPh);
     CurrentPh.onGet(this.getCurrentPh.bind(this));
@@ -62,54 +61,60 @@ export class WaterguruPlatformAccessory {
       minValue: 0,
       maxValue: 10,
       minStep: 0.1,
-      perms: [this.platform.Characteristic.Perms.READ, this.platform.Characteristic.Perms.NOTIFY],
+      perms: [this.platform.Characteristic.Perms.PAIRED_READ, this.platform.Characteristic.Perms.NOTIFY],
     });
     this.chlorineService.addCharacteristic(CurrentChlorine);
     CurrentChlorine.onGet(this.getCurrentFreeChlorine.bind(this));
   }
 
-  /**
-   * Handle "SET" requests from HomeKit
-   * These are sent when the user changes the state of an accessory, for example, turning on a Light bulb.
-   */
-  // async setOn(value: CharacteristicValue) {
-  //   // implement your own code to turn your device on/off
-  //   this.exampleStates.On = value as boolean;
-
-  //   this.platform.log.debug('Set Characteristic On ->', value);
-  // }
-
-
-
   async getCurrentTemp(): Promise<CharacteristicValue> {
-    const waterBody = await this.platform.waterguruSvc?.getWaterbodyInfo(this.accessory.UUID);
-    this.accessory.context.device = waterBody;
-    return (5/9) * (this.accessory.context.device.waterTemp - 32);
+    try {
+      const waterBody = await this.platform.waterguruSvc?.getWaterbodyInfo(this.accessory.UUID);
+      if (!waterBody) {
+        throw new this.platform.api.hap.HapStatusError(this.platform.api.hap.HAPStatus.SERVICE_COMMUNICATION_FAILURE);
+      }
+      this.accessory.context.device = waterBody;
+      return (5 / 9) * (this.accessory.context.device.waterTemp - 32);
+    } catch (error) {
+      this.platform.log.error('Failed to get temperature:', error);
+      throw new this.platform.api.hap.HapStatusError(this.platform.api.hap.HAPStatus.SERVICE_COMMUNICATION_FAILURE);
+    }
   }
 
   async getCurrentFreeChlorine(): Promise<CharacteristicValue> {
-    const waterBody = await this.platform.waterguruSvc?.getWaterbodyInfo(this.accessory.UUID);
-    this.accessory.context.device = waterBody;
-    const measurement = this.accessory.context.device.measurements.find((measurement) => (measurement.type === 'FREE_CL'));
-    return parseFloat(measurement.value);
+    try {
+      const waterBody = await this.platform.waterguruSvc?.getWaterbodyInfo(this.accessory.UUID);
+      if (!waterBody) {
+        throw new this.platform.api.hap.HapStatusError(this.platform.api.hap.HAPStatus.SERVICE_COMMUNICATION_FAILURE);
+      }
+      this.accessory.context.device = waterBody;
+      const measurement = this.accessory.context.device.measurements.find((m) => m.type === 'FREE_CL');
+      if (!measurement) {
+        throw new this.platform.api.hap.HapStatusError(this.platform.api.hap.HAPStatus.SERVICE_COMMUNICATION_FAILURE);
+      }
+      return parseFloat(measurement.value);
+    } catch (error) {
+      this.platform.log.error('Failed to get free chlorine:', error);
+      throw new this.platform.api.hap.HapStatusError(this.platform.api.hap.HAPStatus.SERVICE_COMMUNICATION_FAILURE);
+    }
   }
 
   async getCurrentPh(): Promise<CharacteristicValue> {
-    const waterBody = await this.platform.waterguruSvc?.getWaterbodyInfo(this.accessory.UUID);
-    this.accessory.context.device = waterBody;
-    const measurement = this.accessory.context.device.measurements.find((measurement) => (measurement.type === 'PH'));
-    return parseFloat(measurement.value);
+    try {
+      const waterBody = await this.platform.waterguruSvc?.getWaterbodyInfo(this.accessory.UUID);
+      if (!waterBody) {
+        throw new this.platform.api.hap.HapStatusError(this.platform.api.hap.HAPStatus.SERVICE_COMMUNICATION_FAILURE);
+      }
+      this.accessory.context.device = waterBody;
+      const measurement = this.accessory.context.device.measurements.find((m) => m.type === 'PH');
+      if (!measurement) {
+        throw new this.platform.api.hap.HapStatusError(this.platform.api.hap.HAPStatus.SERVICE_COMMUNICATION_FAILURE);
+      }
+      return parseFloat(measurement.value);
+    } catch (error) {
+      this.platform.log.error('Failed to get pH:', error);
+      throw new this.platform.api.hap.HapStatusError(this.platform.api.hap.HAPStatus.SERVICE_COMMUNICATION_FAILURE);
+    }
   }
-
-  /**
-   * Handle "SET" requests from HomeKit
-   * These are sent when the user changes the state of an accessory, for example, changing the Brightness
-   */
-  // async setBrightness(value: CharacteristicValue) {
-  //   // implement your own code to set the brightness
-  //   this.exampleStates.Brightness = value as number;
-
-  //   this.platform.log.debug('Set Characteristic Brightness -> ', value);
-  // }
 
 }

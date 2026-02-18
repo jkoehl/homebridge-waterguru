@@ -5,7 +5,7 @@ import { Logger } from 'homebridge';
 export default class WaterguruService {
 
 
-  public cognitoSvc: Cognito;
+  private cognitoSvc: Cognito;
   private cachedDashboardInfo = null;
   private lastDashboardCallTime = 0;
 
@@ -44,7 +44,7 @@ export default class WaterguruService {
     if (curTimeMS - 60000 > this.lastDashboardCallTime) {
       this.lastDashboardCallTime = curTimeMS;
       this.log.debug('Refreshing dashboard info from cloud');
-      this.cachedDashboardInfo = await API.post(apiName, path, myInit), 0;
+      this.cachedDashboardInfo = await API.post(apiName, path, myInit);
     } else {
       this.log.debug('Returning cached dashboard info last check:', new Date(this.lastDashboardCallTime));
     }
