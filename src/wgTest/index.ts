@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 import WaterguruService from '../services/wg.service';
 
 const username = process.env.WG_USERNAME || process.argv[2];
