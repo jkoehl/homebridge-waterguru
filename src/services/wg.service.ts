@@ -1,11 +1,12 @@
 import Cognito from './cognito.service';
 import { Amplify, API } from 'aws-amplify';
 import { Logger } from 'homebridge';
+import { CognitoUser } from '@aws-amplify/auth';
 
 export default class WaterguruService {
 
 
-  public cognitoSvc: Cognito;
+  private cognitoSvc: Cognito;
   private cachedDashboardInfo = null;
   private lastDashboardCallTime = 0;
 
@@ -27,11 +28,12 @@ export default class WaterguruService {
     });
   }
 
-  public async signInUser(username: string, password: string): Promise<any> {
+  public async signInUser(username: string, password: string): Promise<CognitoUser> {
     return this.cognitoSvc.signInUser(username, password);
   }
 
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   public async getDashboardInfo(): Promise<any> {
     const apiName = 'WGLambda';
     const path = '/';
@@ -44,13 +46,14 @@ export default class WaterguruService {
     if (curTimeMS - 60000 > this.lastDashboardCallTime) {
       this.lastDashboardCallTime = curTimeMS;
       this.log.debug('Refreshing dashboard info from cloud');
-      this.cachedDashboardInfo = await API.post(apiName, path, myInit), 0;
+      this.cachedDashboardInfo = await API.post(apiName, path, myInit);
     } else {
       this.log.debug('Returning cached dashboard info last check:', new Date(this.lastDashboardCallTime));
     }
     return this.cachedDashboardInfo;
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   public async getWaterbodyInfo(waterBodyId: string): Promise<any> {
     const dashboardInfo = await this.getDashboardInfo();
     return dashboardInfo.waterBodies.find((curWaterBody) => (curWaterBody.waterBodyId === waterBodyId));

@@ -20,8 +20,9 @@ export default class Cognito {
     });
   }
 
-  public async signInUser(username: string, password: string): Promise<CognitoUser | any> {
-    this.cognitoUser = await Auth.signIn(username, password);
-    return this.cognitoUser;
+  public async signInUser(username: string, password: string): Promise<CognitoUser> {
+    const user: CognitoUser = await Auth.signIn(username, password);
+    this.cognitoUser = user;
+    return user;
   }
 }
