@@ -2,17 +2,6 @@ import { Service, PlatformAccessory, CharacteristicValue } from 'homebridge';
 
 import { WaterguruPlatform } from './platform';
 
-// Fixed UUIDs — must never change or HomeKit will create orphaned services on every restart
-const CustomServiceUUID = {
-  PhService: 'A0000001-079E-48FF-8F27-9C2605A29F52',
-  ChlorineService: 'A0000002-079E-48FF-8F27-9C2605A29F52',
-};
-
-const CustomCharacteristicUUID = {
-  CurrentPh: 'B863F10C-079E-48FF-8F27-9C2605A29F52',
-  CurrentChlorine: 'B863F10D-079E-48FF-8F27-9C2605A29F52',
-};
-
 export class WaterguruPlatformAccessory {
   private temperatureService: Service;
   private phService: Service;
@@ -29,42 +18,30 @@ export class WaterguruPlatformAccessory {
       .setCharacteristic(this.platform.Characteristic.Model, 'Unknown')
       .setCharacteristic(this.platform.Characteristic.SerialNumber, 'Unknown');
 
-    // Create Temperature Service
+    // Temperature Service (standard HomeKit — works as-is)
     this.temperatureService = this.accessory.getService(this.platform.Service.TemperatureSensor) ||
-     this.accessory.addService(this.platform.Service.TemperatureSensor);
+      this.accessory.addService(this.platform.Service.TemperatureSensor);
     this.temperatureService.setCharacteristic(this.platform.Characteristic.Name, 'Temperature');
     this.temperatureService.getCharacteristic(this.platform.Characteristic.CurrentTemperature)
       .onGet(this.getCurrentTemp.bind(this));
 
-    // Create Ph Service
-    this.phService = this.accessory.services.find(service => service.UUID === CustomServiceUUID.PhService) ||
-      this.accessory.addService(new this.platform.Service('Ph', CustomServiceUUID.PhService));
-    this.phService.setCharacteristic(this.platform.Characteristic.Name, 'Ph');
-    const CurrentPh = new this.platform.api.hap.Characteristic('Current Ph', CustomCharacteristicUUID.CurrentPh, {
-      format: this.platform.Characteristic.Formats.FLOAT,
-      unit: 'ph',
-      minValue: 0,
-      maxValue: 14,
-      minStep: 0.1,
-      perms: [this.platform.Characteristic.Perms.PAIRED_READ, this.platform.Characteristic.Perms.NOTIFY],
-    });
-    this.phService.addCharacteristic(CurrentPh);
-    CurrentPh.onGet(this.getCurrentPh.bind(this));
+    // pH Service — exposed as HumiditySensor (native HomeKit type Apple Home will display)
+    // pH 0–14 is scaled to 0–100 for the humidity characteristic (multiply by 100/14 ≈ 7.14)
+    // Example: pH 7.4 → displayed as ~52.9 "humidity" — label the tile "pH" in the Home app
+    this.phService = this.accessory.getService('pH') ||
+      this.accessory.addService(this.platform.Service.HumiditySensor, 'pH', 'waterguru-ph');
+    this.phService.setCharacteristic(this.platform.Characteristic.Name, 'pH');
+    this.phService.getCharacteristic(this.platform.Characteristic.CurrentRelativeHumidity)
+      .onGet(this.getCurrentPh.bind(this));
 
-    // Create Chlorine Service
-    this.chlorineService = this.accessory.services.find(service => service.UUID === CustomServiceUUID.ChlorineService) ||
-      this.accessory.addService(new this.platform.Service('Chlorine', CustomServiceUUID.ChlorineService));
+    // Chlorine Service — also exposed as HumiditySensor with a unique subtype
+    // Free chlorine 0–10 ppm is scaled to 0–100 (multiply by 10)
+    // Example: 2.5 ppm → displayed as 25 "humidity" — label the tile "Chlorine" in the Home app
+    this.chlorineService = this.accessory.getService('Chlorine') ||
+      this.accessory.addService(this.platform.Service.HumiditySensor, 'Chlorine', 'waterguru-chlorine');
     this.chlorineService.setCharacteristic(this.platform.Characteristic.Name, 'Chlorine');
-    const CurrentChlorine = new this.platform.api.hap.Characteristic('Current Chlorine', CustomCharacteristicUUID.CurrentChlorine, {
-      format: this.platform.Characteristic.Formats.FLOAT,
-      unit: 'ppm',
-      minValue: 0,
-      maxValue: 10,
-      minStep: 0.1,
-      perms: [this.platform.Characteristic.Perms.PAIRED_READ, this.platform.Characteristic.Perms.NOTIFY],
-    });
-    this.chlorineService.addCharacteristic(CurrentChlorine);
-    CurrentChlorine.onGet(this.getCurrentFreeChlorine.bind(this));
+    this.chlorineService.getCharacteristic(this.platform.Characteristic.CurrentRelativeHumidity)
+      .onGet(this.getCurrentFreeChlorine.bind(this));
   }
 
   async getCurrentTemp(): Promise<CharacteristicValue> {
@@ -92,7 +69,8 @@ export class WaterguruPlatformAccessory {
       if (!measurement) {
         throw new this.platform.api.hap.HapStatusError(this.platform.api.hap.HAPStatus.SERVICE_COMMUNICATION_FAILURE);
       }
-      return parseFloat(measurement.value);
+      // Scale 0–10 ppm → 0–100 for HomeKit humidity characteristic
+      return Math.min(100, Math.max(0, parseFloat(measurement.value) * 10));
     } catch (error) {
       this.platform.log.error('Failed to get free chlorine:', error);
       throw new this.platform.api.hap.HapStatusError(this.platform.api.hap.HAPStatus.SERVICE_COMMUNICATION_FAILURE);
@@ -110,7 +88,8 @@ export class WaterguruPlatformAccessory {
       if (!measurement) {
         throw new this.platform.api.hap.HapStatusError(this.platform.api.hap.HAPStatus.SERVICE_COMMUNICATION_FAILURE);
       }
-      return parseFloat(measurement.value);
+      // Scale 0–14 pH → 0–100 for HomeKit humidity characteristic
+      return Math.min(100, Math.max(0, parseFloat(measurement.value) * (100 / 14)));
     } catch (error) {
       this.platform.log.error('Failed to get pH:', error);
       throw new this.platform.api.hap.HapStatusError(this.platform.api.hap.HAPStatus.SERVICE_COMMUNICATION_FAILURE);
