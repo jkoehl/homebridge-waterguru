@@ -1,15 +1,15 @@
 {
   "displayName": "Homebridge Waterguru",
-  "name": "homebridge-waterguru-gibbs",
+  "name": "homebridge-waterguru-noDevKev",
   "version": "0.2.1",
   "description": "Reads water testing results from a Waterguru device",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
-    "url": "git://github.com/YOUR_GITHUB_USERNAME/homebridge-waterguru.git"
+    "url": "git://github.com/noDevKev/homebridge-waterguru.git"
   },
   "bugs": {
-    "url": "https://github.com/YOUR_GITHUB_USERNAME/homebridge-waterguru/issues"
+    "url": "https://github.com/noDevKev/homebridge-waterguru/issues"
   },
   "engines": {
     "node": ">=14.18.1",
