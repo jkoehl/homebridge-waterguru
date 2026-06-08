@@ -1,76 +1,99 @@
-import { API, DynamicPlatformPlugin, Logger, PlatformAccessory, PlatformConfig, Service, Characteristic } from 'homebridge';
+import { Service, PlatformAccessory, CharacteristicValue } from 'homebridge';
 
-import { PLATFORM_NAME, PLUGIN_NAME } from './settings';
-import { WaterguruPlatformAccessory } from './platformAccessory';
+import { WaterguruPlatform } from './platform';
 
-import WaterguruService from './services/wg.service';
-import {CustomWGCharacteristic} from './CustomWGCharacteristic';
-
-export class WaterguruPlatform implements DynamicPlatformPlugin {
-  public readonly Service: typeof Service = this.api.hap.Service;
-  public readonly Characteristic: typeof Characteristic = this.api.hap.Characteristic;
-
-  public readonly accessories: PlatformAccessory[] = [];
-
-  public waterguruSvc: WaterguruService | undefined;
-  public customCharacteristic: CustomWGCharacteristic;
+export class WaterguruPlatformAccessory {
+  private temperatureService: Service;
+  private phService: Service;
+  private chlorineService: Service;
 
   constructor(
-    public readonly log: Logger,
-    public readonly config: PlatformConfig,
-    public readonly api: API,
+    private readonly platform: WaterguruPlatform,
+    private readonly accessory: PlatformAccessory,
   ) {
-    this.log.debug('Finished initializing platform:', this.config.name);
-    this.customCharacteristic = new CustomWGCharacteristic(api);
 
-    this.api.on('didFinishLaunching', () => {
-      log.debug('Executed didFinishLaunching callback');
-      this.waterguruSvc = new WaterguruService(this.log);
-      this.waterguruSvc?.signInUser(config['wg-username'], config['wg-password'])
-        .then( () => {
-          this.discoverDevices();
-        });
-    });
+    // Set accessory information
+    this.accessory.getService(this.platform.Service.AccessoryInformation)!
+      .setCharacteristic(this.platform.Characteristic.Manufacturer, 'WaterGuru')
+      .setCharacteristic(this.platform.Characteristic.Model, 'Unknown')
+      .setCharacteristic(this.platform.Characteristic.SerialNumber, 'Unknown');
+
+    // Temperature Service (standard HomeKit — works as-is)
+    this.temperatureService = this.accessory.getService(this.platform.Service.TemperatureSensor) ||
+      this.accessory.addService(this.platform.Service.TemperatureSensor);
+    this.temperatureService.setCharacteristic(this.platform.Characteristic.Name, 'Temperature');
+    this.temperatureService.getCharacteristic(this.platform.Characteristic.CurrentTemperature)
+      .onGet(this.getCurrentTemp.bind(this));
+
+    // pH Service — exposed as HumiditySensor (native HomeKit type Apple Home will display)
+    // pH 0–14 is scaled to 0–100 for the humidity characteristic (multiply by 100/14 ≈ 7.14)
+    // Example: pH 7.4 → displayed as ~52.9 "humidity" — label the tile "pH" in the Home app
+    this.phService = this.accessory.getService('pH') ||
+      this.accessory.addService(this.platform.Service.HumiditySensor, 'pH', 'waterguru-ph');
+    this.phService.setCharacteristic(this.platform.Characteristic.Name, 'pH');
+    this.phService.getCharacteristic(this.platform.Characteristic.CurrentRelativeHumidity)
+      .onGet(this.getCurrentPh.bind(this));
+
+    // Chlorine Service — also exposed as HumiditySensor with a unique subtype
+    // Free chlorine 0–10 ppm is scaled to 0–100 (multiply by 10)
+    // Example: 2.5 ppm → displayed as 25 "humidity" — label the tile "Chlorine" in the Home app
+    this.chlorineService = this.accessory.getService('Chlorine') ||
+      this.accessory.addService(this.platform.Service.HumiditySensor, 'Chlorine', 'waterguru-chlorine');
+    this.chlorineService.setCharacteristic(this.platform.Characteristic.Name, 'Chlorine');
+    this.chlorineService.getCharacteristic(this.platform.Characteristic.CurrentRelativeHumidity)
+      .onGet(this.getCurrentFreeChlorine.bind(this));
   }
 
-  /**
-   * This function is invoked when homebridge restores cached accessories from disk at startup.
-   * It should be used to setup event handlers for characteristics and update respective values.
-   */
-  configureAccessory(accessory: PlatformAccessory) {
-    this.log.info('Loading accessory from cache:', accessory.displayName);
-    this.accessories.push(accessory);
+  async getCurrentTemp(): Promise<CharacteristicValue> {
+    try {
+      const waterBody = await this.platform.waterguruSvc?.getWaterbodyInfo(this.accessory.UUID);
+      if (!waterBody) {
+        throw new this.platform.api.hap.HapStatusError(this.platform.api.hap.HAPStatus.SERVICE_COMMUNICATION_FAILURE);
+      }
+      this.accessory.context.device = waterBody;
+      return (5 / 9) * (this.accessory.context.device.waterTemp - 32);
+    } catch (error) {
+      this.platform.log.error('Failed to get temperature:', error);
+      throw new this.platform.api.hap.HapStatusError(this.platform.api.hap.HAPStatus.SERVICE_COMMUNICATION_FAILURE);
+    }
   }
 
-  discoverDevices() {
-
-    this.waterguruSvc && this.waterguruSvc.getDashboardInfo()
-      .then( (dashboardInfo => {
-        this.log.debug(dashboardInfo);
-
-        // Remove any cached devices that we did not get from the WG service
-        const accsNoLongerPresent = this.accessories.filter((o1) => !dashboardInfo.waterBodies.some((o2) => o1.UUID === o2.waterBodyId));
-        this.api.unregisterPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, accsNoLongerPresent);
-
-        for (const waterBody of dashboardInfo.waterBodies) {
-
-          const existingAccessory = this.accessories.find(accessory => accessory.UUID === waterBody.waterBodyId);
-          if (existingAccessory) {
-            this.log.info('Restoring existing accessory from cache:', existingAccessory.displayName);
-
-            existingAccessory.context.device = waterBody;
-            this.api.updatePlatformAccessories([existingAccessory]);
-            new WaterguruPlatformAccessory(this, existingAccessory);
-          } else {
-            // the accessory does not yet exist, so we need to create it
-            this.log.info('Adding new accessory:', waterBody.name);
-            const accessory = new this.api.platformAccessory(waterBody.name, waterBody.waterBodyId);
-            accessory.context.device = waterBody;
-            new WaterguruPlatformAccessory(this, accessory);
-
-            this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [accessory]);
-          }
-        }
-      }));
+  async getCurrentFreeChlorine(): Promise<CharacteristicValue> {
+    try {
+      const waterBody = await this.platform.waterguruSvc?.getWaterbodyInfo(this.accessory.UUID);
+      if (!waterBody) {
+        throw new this.platform.api.hap.HapStatusError(this.platform.api.hap.HAPStatus.SERVICE_COMMUNICATION_FAILURE);
+      }
+      this.accessory.context.device = waterBody;
+      const measurement = this.accessory.context.device.measurements.find((m) => m.type === 'FREE_CL');
+      if (!measurement) {
+        throw new this.platform.api.hap.HapStatusError(this.platform.api.hap.HAPStatus.SERVICE_COMMUNICATION_FAILURE);
+      }
+      // Scale 0–10 ppm → 0–100 for HomeKit humidity characteristic
+      return Math.min(100, Math.max(0, parseFloat(measurement.value) * 10));
+    } catch (error) {
+      this.platform.log.error('Failed to get free chlorine:', error);
+      throw new this.platform.api.hap.HapStatusError(this.platform.api.hap.HAPStatus.SERVICE_COMMUNICATION_FAILURE);
+    }
   }
+
+  async getCurrentPh(): Promise<CharacteristicValue> {
+    try {
+      const waterBody = await this.platform.waterguruSvc?.getWaterbodyInfo(this.accessory.UUID);
+      if (!waterBody) {
+        throw new this.platform.api.hap.HapStatusError(this.platform.api.hap.HAPStatus.SERVICE_COMMUNICATION_FAILURE);
+      }
+      this.accessory.context.device = waterBody;
+      const measurement = this.accessory.context.device.measurements.find((m) => m.type === 'PH');
+      if (!measurement) {
+        throw new this.platform.api.hap.HapStatusError(this.platform.api.hap.HAPStatus.SERVICE_COMMUNICATION_FAILURE);
+      }
+      // Scale 0–14 pH → 0–100 for HomeKit humidity characteristic
+      return Math.min(100, Math.max(0, parseFloat(measurement.value) * (100 / 14)));
+    } catch (error) {
+      this.platform.log.error('Failed to get pH:', error);
+      throw new this.platform.api.hap.HapStatusError(this.platform.api.hap.HAPStatus.SERVICE_COMMUNICATION_FAILURE);
+    }
+  }
+
 }
