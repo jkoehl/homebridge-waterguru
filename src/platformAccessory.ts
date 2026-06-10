@@ -25,22 +25,18 @@ export class WaterguruPlatformAccessory {
     this.temperatureService.getCharacteristic(this.platform.Characteristic.CurrentTemperature)
       .onGet(this.getCurrentTemp.bind(this));
 
-    // pH Service — exposed as HumiditySensor (native HomeKit type Apple Home will display)
-    // pH 0–14 is scaled to 0–100 for the humidity characteristic (multiply by 100/14 ≈ 7.14)
-    // Example: pH 7.4 → displayed as ~52.9 "humidity" — label the tile "pH" in the Home app
+    // pH Service — exposed as TemperatureSensor so HomeKit displays decimals (e.g. 7.5°)
     this.phService = this.accessory.getService('pH') ||
-      this.accessory.addService(this.platform.Service.HumiditySensor, 'pH', 'waterguru-ph');
+      this.accessory.addService(this.platform.Service.TemperatureSensor, 'pH', 'waterguru-ph');
     this.phService.setCharacteristic(this.platform.Characteristic.Name, 'pH');
-    this.phService.getCharacteristic(this.platform.Characteristic.CurrentRelativeHumidity)
+    this.phService.getCharacteristic(this.platform.Characteristic.CurrentTemperature)
       .onGet(this.getCurrentPh.bind(this));
 
-    // Chlorine Service — also exposed as HumiditySensor with a unique subtype
-    // Free chlorine 0–10 ppm is scaled to 0–100 (multiply by 10)
-    // Example: 2.5 ppm → displayed as 25 "humidity" — label the tile "Chlorine" in the Home app
+    // Chlorine Service — also exposed as TemperatureSensor so HomeKit displays decimals (e.g. 2.3°)
     this.chlorineService = this.accessory.getService('Chlorine') ||
-      this.accessory.addService(this.platform.Service.HumiditySensor, 'Chlorine', 'waterguru-chlorine');
+      this.accessory.addService(this.platform.Service.TemperatureSensor, 'Chlorine', 'waterguru-chlorine');
     this.chlorineService.setCharacteristic(this.platform.Characteristic.Name, 'Chlorine');
-    this.chlorineService.getCharacteristic(this.platform.Characteristic.CurrentRelativeHumidity)
+    this.chlorineService.getCharacteristic(this.platform.Characteristic.CurrentTemperature)
       .onGet(this.getCurrentFreeChlorine.bind(this));
   }
 
