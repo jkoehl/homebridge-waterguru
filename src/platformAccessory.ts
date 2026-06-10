@@ -69,8 +69,7 @@ export class WaterguruPlatformAccessory {
       if (!measurement) {
         throw new this.platform.api.hap.HapStatusError(this.platform.api.hap.HAPStatus.SERVICE_COMMUNICATION_FAILURE);
       }
-      // Scale 0–10 ppm → 0–100 for HomeKit humidity characteristic
-      return Math.min(100, Math.max(0, parseFloat(measurement.value) * 10));
+      return parseFloat(measurement.value);
     } catch (error) {
       this.platform.log.error('Failed to get free chlorine:', error);
       throw new this.platform.api.hap.HapStatusError(this.platform.api.hap.HAPStatus.SERVICE_COMMUNICATION_FAILURE);
@@ -88,8 +87,7 @@ export class WaterguruPlatformAccessory {
       if (!measurement) {
         throw new this.platform.api.hap.HapStatusError(this.platform.api.hap.HAPStatus.SERVICE_COMMUNICATION_FAILURE);
       }
-      // Scale 0–14 pH → 0–100 for HomeKit humidity characteristic
-      return Math.min(100, Math.max(0, parseFloat(measurement.value) * (100 / 14)));
+      return parseFloat(measurement.value);
     } catch (error) {
       this.platform.log.error('Failed to get pH:', error);
       throw new this.platform.api.hap.HapStatusError(this.platform.api.hap.HAPStatus.SERVICE_COMMUNICATION_FAILURE);
