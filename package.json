@@ -1,6 +1,6 @@
 {
   "displayName": "Homebridge Waterguru",
-  "name": "homebridge-waterguru-noDevKev",
+  "name": "homebridge-waterguru-plus",
   "version": "0.2.2",
   "description": "Reads water testing results from a Waterguru device",
   "license": "Apache-2.0",
