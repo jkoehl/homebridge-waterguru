@@ -1,7 +1,7 @@
 {
   "displayName": "Homebridge Waterguru",
   "name": "homebridge-waterguru-plus",
-  "version": "0.2.4",
+  "version": "0.2.5",
   "description": "Reads water testing results from a Waterguru device",
   "license": "Apache-2.0",
   "repository": {
