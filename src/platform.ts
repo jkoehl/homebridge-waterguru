@@ -2,17 +2,23 @@ import { API, DynamicPlatformPlugin, Logger, PlatformAccessory, PlatformConfig, 
 
 import { PLATFORM_NAME, PLUGIN_NAME } from './settings';
 import { WaterguruPlatformAccessory } from './platformAccessory';
-
 import WaterguruService from './services/wg.service';
-import {CustomWGCharacteristic} from './CustomWGCharacteristic';
+import { CustomWGCharacteristic } from './CustomWGCharacteristic';
+
+// Each measurement becomes its own HomeKit accessory so they appear as
+// separate room tiles instead of being grouped under one accessory.
+const MEASUREMENTS = [
+  { key: 'temp', label: 'Pool Temperature' },
+  { key: 'ph', label: 'Pool pH' },
+  { key: 'chlorine', label: 'Pool Chlorine' },
+];
 
 export class WaterguruPlatform implements DynamicPlatformPlugin {
   public readonly Service: typeof Service = this.api.hap.Service;
   public readonly Characteristic: typeof Characteristic = this.api.hap.Characteristic;
 
   public readonly accessories: PlatformAccessory[] = [];
-
-  public waterguruSvc: WaterguruService | undefined;
+  public waterguruSvc?: WaterguruService;
   public customCharacteristic: CustomWGCharacteristic;
 
   constructor(
@@ -26,51 +32,58 @@ export class WaterguruPlatform implements DynamicPlatformPlugin {
     this.api.on('didFinishLaunching', () => {
       log.debug('Executed didFinishLaunching callback');
       this.waterguruSvc = new WaterguruService(this.log);
-      this.waterguruSvc?.signInUser(config['wg-username'], config['wg-password'])
-        .then( () => {
-          this.discoverDevices();
-        });
+      this.waterguruSvc?.signInUser(config['wg-username'], config['wg-password']).then(() => {
+        this.discoverDevices();
+      });
     });
   }
 
-  /**
-   * This function is invoked when homebridge restores cached accessories from disk at startup.
-   * It should be used to setup event handlers for characteristics and update respective values.
-   */
   configureAccessory(accessory: PlatformAccessory) {
     this.log.info('Loading accessory from cache:', accessory.displayName);
     this.accessories.push(accessory);
   }
 
   discoverDevices() {
-
     this.waterguruSvc && this.waterguruSvc.getDashboardInfo()
-      .then( (dashboardInfo => {
+      .then((dashboardInfo) => {
         this.log.debug(dashboardInfo);
 
-        // Remove any cached devices that we did not get from the WG service
-        const accsNoLongerPresent = this.accessories.filter((o1) => !dashboardInfo.waterBodies.some((o2) => o1.UUID === o2.waterBodyId));
-        this.api.unregisterPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, accsNoLongerPresent);
-
+        // Build the set of UUIDs we expect (one per measurement per water body)
+        const expectedUUIDs: string[] = [];
         for (const waterBody of dashboardInfo.waterBodies) {
-
-          const existingAccessory = this.accessories.find(accessory => accessory.UUID === waterBody.waterBodyId);
-          if (existingAccessory) {
-            this.log.info('Restoring existing accessory from cache:', existingAccessory.displayName);
-
-            existingAccessory.context.device = waterBody;
-            this.api.updatePlatformAccessories([existingAccessory]);
-            new WaterguruPlatformAccessory(this, existingAccessory);
-          } else {
-            // the accessory does not yet exist, so we need to create it
-            this.log.info('Adding new accessory:', waterBody.name);
-            const accessory = new this.api.platformAccessory(waterBody.name, waterBody.waterBodyId);
-            accessory.context.device = waterBody;
-            new WaterguruPlatformAccessory(this, accessory);
-
-            this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [accessory]);
+          for (const m of MEASUREMENTS) {
+            expectedUUIDs.push(this.api.hap.uuid.generate(waterBody.waterBodyId + '-' + m.key));
           }
         }
-      }));
+
+        // Remove any cached accessories we no longer expect
+        const accsNoLongerPresent = this.accessories.filter((acc) => !expectedUUIDs.includes(acc.UUID));
+        if (accsNoLongerPresent.length > 0) {
+          this.api.unregisterPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, accsNoLongerPresent);
+        }
+
+        for (const waterBody of dashboardInfo.waterBodies) {
+          for (const m of MEASUREMENTS) {
+            const uuid = this.api.hap.uuid.generate(waterBody.waterBodyId + '-' + m.key);
+            const displayName = m.label;
+            const existingAccessory = this.accessories.find(acc => acc.UUID === uuid);
+
+            if (existingAccessory) {
+              this.log.info('Restoring existing accessory from cache:', existingAccessory.displayName);
+              existingAccessory.context.device = waterBody;
+              existingAccessory.context.measurementKey = m.key;
+              this.api.updatePlatformAccessories([existingAccessory]);
+              new WaterguruPlatformAccessory(this, existingAccessory);
+            } else {
+              this.log.info('Adding new accessory:', displayName);
+              const accessory = new this.api.platformAccessory(displayName, uuid);
+              accessory.context.device = waterBody;
+              accessory.context.measurementKey = m.key;
+              new WaterguruPlatformAccessory(this, accessory);
+              this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [accessory]);
+            }
+          }
+        }
+      });
   }
 }

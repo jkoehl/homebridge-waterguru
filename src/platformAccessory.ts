@@ -2,79 +2,58 @@ import { Service, PlatformAccessory, CharacteristicValue } from 'homebridge';
 
 import { WaterguruPlatform } from './platform';
 
-// Fixed UUIDs — must never change or HomeKit will create orphaned services on every restart
-const CustomServiceUUID = {
-  PhService: 'A0000001-079E-48FF-8F27-9C2605A29F52',
-  ChlorineService: 'A0000002-079E-48FF-8F27-9C2605A29F52',
-};
-
-const CustomCharacteristicUUID = {
-  CurrentPh: 'B863F10C-079E-48FF-8F27-9C2605A29F52',
-  CurrentChlorine: 'B863F10D-079E-48FF-8F27-9C2605A29F52',
-};
-
 export class WaterguruPlatformAccessory {
-  private temperatureService: Service;
-  private phService: Service;
-  private chlorineService: Service;
+  private service!: Service;
 
   constructor(
     private readonly platform: WaterguruPlatform,
     private readonly accessory: PlatformAccessory,
   ) {
+    const key = this.accessory.context.measurementKey;
 
-    // Set accessory information
+    // Accessory information
     this.accessory.getService(this.platform.Service.AccessoryInformation)!
       .setCharacteristic(this.platform.Characteristic.Manufacturer, 'WaterGuru')
-      .setCharacteristic(this.platform.Characteristic.Model, 'Unknown')
-      .setCharacteristic(this.platform.Characteristic.SerialNumber, 'Unknown');
+      .setCharacteristic(this.platform.Characteristic.Model, 'Sense')
+      .setCharacteristic(this.platform.Characteristic.SerialNumber, this.accessory.UUID);
 
-    // Create Temperature Service
-    this.temperatureService = this.accessory.getService(this.platform.Service.TemperatureSensor) ||
-     this.accessory.addService(this.platform.Service.TemperatureSensor);
-    this.temperatureService.setCharacteristic(this.platform.Characteristic.Name, 'Temperature');
-    this.temperatureService.getCharacteristic(this.platform.Characteristic.CurrentTemperature)
-      .onGet(this.getCurrentTemp.bind(this));
+    if (key === 'temp') {
+      this.service = this.accessory.getService(this.platform.Service.TemperatureSensor) ||
+        this.accessory.addService(this.platform.Service.TemperatureSensor);
+      this.service.setCharacteristic(this.platform.Characteristic.Name, 'Pool Temperature');
+      this.service.getCharacteristic(this.platform.Characteristic.CurrentTemperature)
+        .onGet(this.getCurrentTemp.bind(this));
+    } else if (key === 'ph') {
+      this.service = this.accessory.getService(this.platform.Service.LightSensor) ||
+        this.accessory.addService(this.platform.Service.LightSensor);
+      this.service.setCharacteristic(this.platform.Characteristic.Name, 'Pool pH');
+      this.service.getCharacteristic(this.platform.Characteristic.CurrentAmbientLightLevel)
+        .setProps({ minValue: 0, maxValue: 14, minStep: 0.1 })
+        .onGet(this.getCurrentPh.bind(this));
+    } else if (key === 'chlorine') {
+      this.service = this.accessory.getService(this.platform.Service.LightSensor) ||
+        this.accessory.addService(this.platform.Service.LightSensor);
+      this.service.setCharacteristic(this.platform.Characteristic.Name, 'Pool Chlorine');
+      this.service.getCharacteristic(this.platform.Characteristic.CurrentAmbientLightLevel)
+        .setProps({ minValue: 0, maxValue: 10, minStep: 0.1 })
+        .onGet(this.getCurrentFreeChlorine.bind(this));
+    }
+  }
 
-    // Create Ph Service
-    this.phService = this.accessory.services.find(service => service.UUID === CustomServiceUUID.PhService) ||
-      this.accessory.addService(new this.platform.Service('Ph', CustomServiceUUID.PhService));
-    this.phService.setCharacteristic(this.platform.Characteristic.Name, 'Ph');
-    const CurrentPh = new this.platform.api.hap.Characteristic('Current Ph', CustomCharacteristicUUID.CurrentPh, {
-      format: this.platform.Characteristic.Formats.FLOAT,
-      unit: 'ph',
-      minValue: 0,
-      maxValue: 14,
-      minStep: 0.1,
-      perms: [this.platform.Characteristic.Perms.PAIRED_READ, this.platform.Characteristic.Perms.NOTIFY],
-    });
-    this.phService.addCharacteristic(CurrentPh);
-    CurrentPh.onGet(this.getCurrentPh.bind(this));
-
-    // Create Chlorine Service
-    this.chlorineService = this.accessory.services.find(service => service.UUID === CustomServiceUUID.ChlorineService) ||
-      this.accessory.addService(new this.platform.Service('Chlorine', CustomServiceUUID.ChlorineService));
-    this.chlorineService.setCharacteristic(this.platform.Characteristic.Name, 'Chlorine');
-    const CurrentChlorine = new this.platform.api.hap.Characteristic('Current Chlorine', CustomCharacteristicUUID.CurrentChlorine, {
-      format: this.platform.Characteristic.Formats.FLOAT,
-      unit: 'ppm',
-      minValue: 0,
-      maxValue: 10,
-      minStep: 0.1,
-      perms: [this.platform.Characteristic.Perms.PAIRED_READ, this.platform.Characteristic.Perms.NOTIFY],
-    });
-    this.chlorineService.addCharacteristic(CurrentChlorine);
-    CurrentChlorine.onGet(this.getCurrentFreeChlorine.bind(this));
+  async getWaterBody() {
+    const waterBodyId = this.accessory.context.device.waterBodyId;
+    const waterBody = await this.platform.waterguruSvc?.getWaterbodyInfo(waterBodyId);
+    if (!waterBody) {
+      throw new this.platform.api.hap.HapStatusError(this.platform.api.hap.HAPStatus.SERVICE_COMMUNICATION_FAILURE);
+    }
+    this.accessory.context.device = waterBody;
+    return waterBody;
   }
 
   async getCurrentTemp(): Promise<CharacteristicValue> {
     try {
-      const waterBody = await this.platform.waterguruSvc?.getWaterbodyInfo(this.accessory.UUID);
-      if (!waterBody) {
-        throw new this.platform.api.hap.HapStatusError(this.platform.api.hap.HAPStatus.SERVICE_COMMUNICATION_FAILURE);
-      }
-      this.accessory.context.device = waterBody;
-      return (5 / 9) * (this.accessory.context.device.waterTemp - 32);
+      const waterBody = await this.getWaterBody();
+      return (5 / 9) * (waterBody.waterTemp - 32);
     } catch (error) {
       this.platform.log.error('Failed to get temperature:', error);
       throw new this.platform.api.hap.HapStatusError(this.platform.api.hap.HAPStatus.SERVICE_COMMUNICATION_FAILURE);
@@ -83,12 +62,8 @@ export class WaterguruPlatformAccessory {
 
   async getCurrentFreeChlorine(): Promise<CharacteristicValue> {
     try {
-      const waterBody = await this.platform.waterguruSvc?.getWaterbodyInfo(this.accessory.UUID);
-      if (!waterBody) {
-        throw new this.platform.api.hap.HapStatusError(this.platform.api.hap.HAPStatus.SERVICE_COMMUNICATION_FAILURE);
-      }
-      this.accessory.context.device = waterBody;
-      const measurement = this.accessory.context.device.measurements.find((m) => m.type === 'FREE_CL');
+      const waterBody = await this.getWaterBody();
+      const measurement = waterBody.measurements.find((m) => m.type === 'FREE_CL');
       if (!measurement) {
         throw new this.platform.api.hap.HapStatusError(this.platform.api.hap.HAPStatus.SERVICE_COMMUNICATION_FAILURE);
       }
@@ -101,12 +76,8 @@ export class WaterguruPlatformAccessory {
 
   async getCurrentPh(): Promise<CharacteristicValue> {
     try {
-      const waterBody = await this.platform.waterguruSvc?.getWaterbodyInfo(this.accessory.UUID);
-      if (!waterBody) {
-        throw new this.platform.api.hap.HapStatusError(this.platform.api.hap.HAPStatus.SERVICE_COMMUNICATION_FAILURE);
-      }
-      this.accessory.context.device = waterBody;
-      const measurement = this.accessory.context.device.measurements.find((m) => m.type === 'PH');
+      const waterBody = await this.getWaterBody();
+      const measurement = waterBody.measurements.find((m) => m.type === 'PH');
       if (!measurement) {
         throw new this.platform.api.hap.HapStatusError(this.platform.api.hap.HAPStatus.SERVICE_COMMUNICATION_FAILURE);
       }

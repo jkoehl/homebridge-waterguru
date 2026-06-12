@@ -1,15 +1,15 @@
 {
   "displayName": "Homebridge Waterguru",
-  "name": "@jkoehl/homebridge-waterguru",
-  "version": "0.2.1",
+  "name": "homebridge-waterguru-plus",
+  "version": "0.2.6",
   "description": "Reads water testing results from a Waterguru device",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
-    "url": "git://github.com/jkoehl/homebridge-waterguru.git"
+    "url": "git://github.com/noDevKev/homebridge-waterguru.git"
   },
   "bugs": {
-    "url": "https://github.com/jkoehl/homebridge-waterguru/issues"
+    "url": "https://github.com/noDevKev/homebridge-waterguru/issues"
   },
   "engines": {
     "node": ">=14.18.1",
@@ -20,6 +20,7 @@
     "lint": "eslint \"src/**/*.ts\" --max-warnings=0",
     "watch": "npm run build && npm link && nodemon",
     "build": "rimraf ./dist && tsc",
+    "prepare": "npm run build",
     "testWg": "node ./dist/wgTest/index.js",
     "prepublishOnly": "npm run lint && npm run build"
   },
